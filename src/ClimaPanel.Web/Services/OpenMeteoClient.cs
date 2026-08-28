@@ -26,14 +26,14 @@ public sealed class OpenMeteoClient : IWeatherClient
         CancellationToken cancellationToken)
     {
 
-
         var baseUrl = _configuration["OpenMeteo:GeocodingBaseUrl"]
-            ?? "https://geocoding-api.open-meteo.com";
+                         ?? "https://geocoding-api.open-meteo.com";
 
-
-
-        var url = "/v1/search?name=" + Uri.EscapeDataString(query)
+        var url = baseUrl.TrimEnd('/')
+            + "/v1/search?name=" + Uri.EscapeDataString(query)
             + "&count=8&language=es&format=json";
+
+
 
         using var response = await _httpClient.GetAsync(
              url,
@@ -68,19 +68,19 @@ public sealed class OpenMeteoClient : IWeatherClient
         string timezone,
         CancellationToken cancellationToken)
     {
-        using var client = new HttpClient
-        {
-            BaseAddress = new Uri(_configuration["OpenMeteo:ForecastBaseUrl"]
-                ?? "https://api.open-meteo.com")
-        };
+        var baseUrl = _configuration["OpenMeteo:ForecastBaseUrl"]
+            ?? "https://api.open-meteo.com";
 
-        var url = "/v1/forecast"
-            + $"?latitude={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+        var url = baseUrl.TrimEnd('/') + "/v1/forecast"
+             + $"?latitude={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
             + $"&longitude={longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
             + "&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m"
             + "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum"
             + "&forecast_days=5"
             + "&timezone=" + Uri.EscapeDataString(timezone);
+
+
+ 
 
         using var response = await _httpClient.GetAsync(
             url,

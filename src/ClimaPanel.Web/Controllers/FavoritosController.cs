@@ -59,19 +59,37 @@ public sealed class FavoritosController : Controller
         }
     }
 
+
+    //Samuel Alvarado: Cambio para controlar errores
     [HttpGet]
     public async Task<IActionResult> Detalle(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var user = _currentUser.GetCurrent();
-        var city = await _service.GetAsync(user.Id, id, cancellationToken);
-        var weather = await _service.GetWeatherAsync(user.Id, id, cancellationToken);
-        return View(new FavoriteDetailsViewModel
+        try
         {
-            City = city,
-            Weather = weather
-        });
+            var user = _currentUser.GetCurrent();
+
+            var city = await _service.GetAsync(
+                user.Id,
+                id,
+                cancellationToken);
+
+            var weather = await _service.GetWeatherAsync(
+                user.Id,
+                id,
+                cancellationToken);
+
+            return View(new FavoriteDetailsViewModel
+            {
+                City = city,
+                Weather = weather
+            });
+        }
+        catch (UserMessageException)
+        {
+            return NotFound();
+        }
     }
 
     [HttpPost]

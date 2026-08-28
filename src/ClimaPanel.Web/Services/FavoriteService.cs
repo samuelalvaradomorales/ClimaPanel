@@ -59,38 +59,46 @@ public sealed class FavoriteService
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var allRows = await _db.FavoriteCities
+        var searchTerm = search?.Trim();
+
+        IQueryable<FavoriteCity> query = _db.FavoriteCities
             .AsNoTracking()
-            .ToListAsync(cancellationToken);
+            .Where(x => x.UserId == userId);
 
-        IEnumerable<FavoriteCity> query = allRows.Where(x => x.UserId == userId);
-
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             query = query.Where(x =>
-                x.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                x.Country.Contains(search, StringComparison.OrdinalIgnoreCase));
+                EF.Functions.Like(x.Name, $"%{searchTerm}%") ||
+                EF.Functions.Like(x.Country, $"%{searchTerm}%"));
         }
 
         query = query.OrderBy(x => x.Name);
-        var total = query.Count();
-        var items = query
+
+        var total = await query.CountAsync(cancellationToken);
+
+        var rows = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var items = rows
             .Select(ToListItem)
             .ToArray();
 
         return new FavoriteListViewModel
         {
             Items = items,
-            Search = search?.Trim() ?? string.Empty,
+            Search = searchTerm ?? string.Empty,
             Page = page,
             PageSize = pageSize,
             Total = total,
-            TotalPages = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize))
+            TotalPages = Math.Max(
+                1,
+                (int)Math.Ceiling(total / (double)pageSize))
         };
     }
 
+    //Samuel Alvarado:  Ahora se considera userId para obtener la ciudad favorita, para evitar que un usuario pueda acceder a la ciudad favorita de otro usuario.
     public async Task<FavoriteCity> GetAsync(
         string userId,
         Guid id,
@@ -98,7 +106,9 @@ public sealed class FavoriteService
     {
         return await _db.FavoriteCities
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            .FirstOrDefaultAsync(
+                x => x.Id == id && x.UserId == userId,
+                cancellationToken)
             ?? throw NotFound();
     }
 
@@ -115,6 +125,7 @@ public sealed class FavoriteService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    //Samuel Alvarado: Se considera userId para obtener la ciudad favorita y su clima, para evitar que un usuario pueda acceder a la ciudad favorita de otro usuario.
     public async Task<WeatherCard> GetWeatherAsync(
         string userId,
         Guid id,
@@ -122,7 +133,9 @@ public sealed class FavoriteService
     {
         var city = await _db.FavoriteCities
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            .FirstOrDefaultAsync(
+                x => x.Id == id && x.UserId == userId,
+                cancellationToken)
             ?? throw NotFound();
 
         return await _weatherCache.GetAsync(city, false, cancellationToken);
