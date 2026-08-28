@@ -45,7 +45,21 @@ public sealed class FavoriteService
         };
 
         _db.FavoriteCities.Add(entity);
-        await _db.SaveChangesAsync(cancellationToken);
+
+        // Samuel Alvarado:
+        // Se captura DbUpdateException para cubrir condiciones de carrera.
+        // Si dos solicitudes insertan la misma ciudad al mismo tiempo,
+        // el índice único de SQLite garantiza la integridad y se devuelve un mensaje amigable al usuario.
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            throw new UserMessageException(
+                "La ciudad ya se encuentra en sus favoritos.");
+        }
+
         return entity;
     }
 
