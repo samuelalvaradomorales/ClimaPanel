@@ -10,19 +10,24 @@ namespace ClimaPanel.Web.Controllers;
 public sealed class HomeController : Controller
 {
     private readonly IWeatherClient _weatherClient;
+    private readonly ILogger<HomeController> _logger;
 
-    public HomeController(IWeatherClient weatherClient)
+
+    public HomeController(
+    IWeatherClient weatherClient,
+    ILogger<HomeController> logger)
     {
         _weatherClient = weatherClient;
+        _logger = logger;
     }
 
 
-
-    //Samuel Alvarado:  Ahora se manejan casos de errores
+    // Samuel Alvarado: manejo seguro de errores en consultas a Open-Meteo.
+    // Se registran detalles técnicos en logs y se muestran mensajes amigables al usuario.
     [HttpGet]
     public async Task<IActionResult> Index(
-    string? q,
-    CancellationToken cancellationToken)
+        string? q,
+        CancellationToken cancellationToken)
     {
         var query = q?.Trim() ?? string.Empty;
 
@@ -32,26 +37,48 @@ public sealed class HomeController : Controller
         {
             try
             {
-                results = await _weatherClient.SearchAsync(query, cancellationToken);
+                results = await _weatherClient.SearchAsync(
+                    query,
+                    cancellationToken);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
             {
+                _logger.LogInformation(
+                    "La búsqueda meteorológica fue cancelada por el cliente. Consulta: {Query}",
+                    query);
+
                 return StatusCode(499);
             }
-            catch (TaskCanceledException)
+            catch (TaskCanceledException exception)
             {
+                _logger.LogWarning(
+                    exception,
+                    "Timeout al consultar Open-Meteo. Consulta: {Query}",
+                    query);
+
                 ModelState.AddModelError(
                     string.Empty,
                     "El servicio meteorológico tardó demasiado en responder.");
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException exception)
             {
+                _logger.LogWarning(
+                    exception,
+                    "Error HTTP al consultar Open-Meteo. Consulta: {Query}",
+                    query);
+
                 ModelState.AddModelError(
                     string.Empty,
                     "No fue posible consultar el servicio meteorológico.");
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException exception)
             {
+                _logger.LogWarning(
+                    exception,
+                    "Respuesta inválida de Open-Meteo. Consulta: {Query}",
+                    query);
+
                 ModelState.AddModelError(
                     string.Empty,
                     "El servicio meteorológico entregó una respuesta inválida.");

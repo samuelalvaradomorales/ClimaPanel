@@ -63,6 +63,7 @@ public sealed class FavoriteService
         return entity;
     }
 
+    // Samuel Alvarado: filtros, ordenamiento, conteo y paginación se ejecutan directamente en SQLite antes de materializar los resultados.
     public async Task<FavoriteListViewModel> ListAsync(
         string userId,
         string? search,
@@ -126,14 +127,17 @@ public sealed class FavoriteService
             ?? throw NotFound();
     }
 
+    // Samuel Alvarado: Faltaba validar la propiedad del favorito antes de eliminarlo, evitando que un usuario pueda eliminar recursos pertenecientes a otro usuario.
     public async Task DeleteAsync(
         string userId,
         Guid id,
         CancellationToken cancellationToken)
     {
         var entity = await _db.FavoriteCities
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
-            ?? throw NotFound();
+                        .FirstOrDefaultAsync(
+                            x => x.Id == id && x.UserId == userId,
+                            cancellationToken)
+                        ?? throw NotFound();
 
         _db.FavoriteCities.Remove(entity);
         await _db.SaveChangesAsync(cancellationToken);
