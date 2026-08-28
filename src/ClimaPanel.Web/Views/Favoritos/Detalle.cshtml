@@ -48,20 +48,223 @@
     }
 </div>
 
-<section class="panel alerts-panel alerts-placeholder">
+<section class="panel alerts-panel">
     <div>
-        <span class="eyebrow">Funcionalidad nueva de extremo a extremo</span>
+        <span class="eyebrow">Alertas meteorológicas</span>
         <h2>Alertas por umbral</h2>
-        <p>
-            Implemente aquí el flujo completo para crear, listar, activar,
-            desactivar, evaluar y eliminar alertas meteorológicas privadas.
-        </p>
+
         <p class="hint">
-            Ejemplos: temperatura ≥ 30 °C, humedad ≤ 35 %, precipitación ≥ 5 mm
-            o viento ≥ 45 km/h.
+            Configure hasta 5 alertas activas por ciudad.
+            Ejemplos: temperatura ≥ 30 °C, humedad ≤ 35 %,
+            precipitación ≥ 5 mm o viento ≥ 45 km/h.
         </p>
     </div>
-    <span class="pending-badge">Pendiente de desarrollo</span>
+
+    @if (TempData["Error"] is not null)
+    {
+        <div class="validation-summary-errors">
+            @TempData["Error"]
+        </div>
+    }
+
+    @if (TempData["Success"] is not null)
+    {
+        <div class="alert alert-success">
+            @TempData["Success"]
+        </div>
+    }
+
+    <!-- Samuel Alvarado: formulario para crear una nueva alerta
+         asociada a la ciudad favorita actual. -->
+    <form asp-action="CrearAlerta"
+          method="post"
+          data-lock-submit>
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden"
+               name="FavoriteId"
+               value="@Model.City.Id" />
+
+        <div class="form-grid">
+
+            <div>
+                <label for="Metric">Métrica</label>
+
+                <select id="Metric"
+                        name="Metric"
+                        class="form-control"
+                        required>
+                    <option value="1">Temperatura °C</option>
+                    <option value="2">Humedad %</option>
+                    <option value="3">Precipitación mm</option>
+                    <option value="4">Viento km/h</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="Operator">Operador</label>
+
+                <select id="Operator"
+                        name="Operator"
+                        class="form-control"
+                        required>
+                    <option value="1">Mayor o igual que (≥)</option>
+                    <option value="2">Menor o igual que (≤)</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="Threshold">Umbral</label>
+
+                <input id="Threshold"
+                       name="Threshold"
+                       type="number"
+                       step="0.1"
+                       class="form-control"
+                       required />
+            </div>
+
+        </div>
+
+        <button class="button button-primary"
+                type="submit">
+            Crear alerta
+        </button>
+    </form>
+
+
+    <div class="alerts-list">
+
+        @if (Model.Alerts.Count == 0)
+        {
+            <p class="hint">
+                Esta ciudad todavía no tiene alertas configuradas.
+            </p>
+        }
+        else
+        {
+            @foreach (var alert in Model.Alerts)
+            {
+                var metricName = alert.Metric switch
+                {
+                    ClimaPanel.Web.Models.WeatherMetric.TemperatureC => "Temperatura",
+                    ClimaPanel.Web.Models.WeatherMetric.HumidityPercent => "Humedad",
+                    ClimaPanel.Web.Models.WeatherMetric.PrecipitationMm => "Precipitación",
+                    ClimaPanel.Web.Models.WeatherMetric.WindSpeedKmh => "Viento",
+                    _ => "Métrica"
+                };
+
+                var unit = alert.Metric switch
+                {
+                    ClimaPanel.Web.Models.WeatherMetric.TemperatureC => "°C",
+                    ClimaPanel.Web.Models.WeatherMetric.HumidityPercent => "%",
+                    ClimaPanel.Web.Models.WeatherMetric.PrecipitationMm => "mm",
+                    ClimaPanel.Web.Models.WeatherMetric.WindSpeedKmh => "km/h",
+                    _ => ""
+                };
+
+                var operatorText =
+                alert.Operator == ClimaPanel.Web.Models.ThresholdOperator.GreaterThanOrEqual
+                ? "≥"
+                : "≤";
+
+                <article class="alert-card">
+
+                    <div>
+                        <strong>
+                            @metricName @operatorText @alert.Threshold.ToString("0.##") @unit
+                        </strong>
+
+                        <div>
+                            Estado:
+                            <strong>
+                                @(alert.IsEnabled ? "Activa" : "Inactiva")
+                            </strong>
+                        </div>
+
+                        <div>
+                            Evaluación:
+                            <strong>
+                                @(alert.IsTriggered ? "DISPARADA" : "Sin disparar")
+                            </strong>
+                        </div>
+
+                        @if (alert.LastEvaluatedAtUtc.HasValue)
+                        {
+                            <small>
+                                Última evaluación:
+                                @(alert.LastEvaluatedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))
+                            </small>
+                        }
+
+                        @if (alert.LastTriggeredAtUtc.HasValue)
+                        {
+                            <small>
+                                Último disparo:
+                                @(alert.LastTriggeredAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))
+                            </small>
+                        }
+                </div>
+
+
+                <div class="alert-actions">
+
+                    <!-- Samuel Alvarado: activa o desactiva la alerta
+                         mediante POST protegido con antiforgery. -->
+                    <form asp-action="ToggleAlerta"
+                          method="post"
+                          data-lock-submit>
+
+                        @Html.AntiForgeryToken()
+
+                        <input type="hidden"
+                               name="favoriteId"
+                               value="@Model.City.Id" />
+
+                        <input type="hidden"
+                               name="alertId"
+                               value="@alert.Id" />
+
+                        <button class="button"
+                                type="submit">
+                            @(alert.IsEnabled
+                                                    ? "Desactivar"
+                                                    : "Activar")
+                    </button>
+                </form>
+
+
+                        <!-- Samuel Alvarado: elimina la alerta asociada
+                             únicamente a la ciudad favorita actual. -->
+                        <form asp-action="EliminarAlerta"
+                              method="post"
+                              data-lock-submit
+                              data-confirm="¿Eliminar esta alerta?">
+
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden"
+                                   name="favoriteId"
+                                   value="@Model.City.Id" />
+
+                            <input type="hidden"
+                                   name="alertId"
+                                   value="@alert.Id" />
+
+                            <button class="button button-danger"
+                                    type="submit">
+                                Eliminar
+                            </button>
+                        </form>
+
+                    </div>
+
+                </article>
+                }
+        }
+
+    </div>
 </section>
 
 <div class="action-bar">
