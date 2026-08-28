@@ -27,7 +27,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={databasePath};Cache=Shared;Default Timeout=5"));
 
 builder.Services.AddSingleton<ICurrentUser, CookieCurrentUser>();
-builder.Services.AddSingleton<IWeatherClient, OpenMeteoClient>();
+
+//cambio http y timeout Samuel Alvarado
+builder.Services.AddHttpClient<IWeatherClient, OpenMeteoClient>(client =>
+ {
+     client.Timeout = TimeSpan.FromSeconds(10);
+ });
+
+
+
 builder.Services.AddSingleton<WeatherCacheService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddScoped<WeatherAlertService>();
