@@ -98,10 +98,26 @@ public sealed class FavoritosController : Controller
         Guid id,
         CancellationToken cancellationToken)
     {
-        var user = _currentUser.GetCurrent();
-        await _service.RefreshAsync(user.Id, id, cancellationToken);
-        TempData["Success"] = "El pronóstico fue actualizado.";
-        return RedirectToAction(nameof(Detalle), new { id });
+        try
+        {
+            var user = _currentUser.GetCurrent();
+
+            var weather = await _service.RefreshAsync(
+                user.Id,
+                id,
+                cancellationToken);
+
+            TempData["Success"] =
+                weather.Source == "STALE"
+                    ? "No fue posible obtener información nueva. Se muestran los últimos datos disponibles."
+                    : "El pronóstico fue actualizado.";
+
+            return RedirectToAction(nameof(Detalle), new { id });
+        }
+        catch (UserMessageException)
+        {
+            return NotFound();
+        }
     }
 
     [HttpPost]
